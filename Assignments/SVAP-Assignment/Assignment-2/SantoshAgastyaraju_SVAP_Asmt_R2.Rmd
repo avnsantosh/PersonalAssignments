@@ -1,0 +1,155 @@
+---
+title: "SantoshAgastyaraju_SVAP_Asmt_R2"
+output:
+  html_document: default
+  html_notebook: default
+---
+This case study is on the Farmers Queries in Kisan Call Centre (KCC) from Kurnool district of Andhra Pradesh.
+The data is downloaded from site in json file format.
+
+#Step-1: Frame the Problem: Identify the key question are you trying to answer
+
+  1. Predict the number of calls KCC will receive in 2017 on daily basis
+
+#Step-2: Acquire the Data: Get the dataset to answer the question.
+  
+  Acquire the data from the json files for each month and then load into data frame.
+  
+```{r}
+library(jsonlite)
+  filenames <- list.files("F:\\GLIMS-PGPBDA\\Assignments\\SVAP-Assignment\\Assignment-2\\", pattern="*.json", full.names=TRUE)
+  jsondata = data.frame()
+  for (filename in filenames) {
+    print(paste("Processing and Loading the File",filename))
+   jsondata = rbind(jsondata,(fromJSON(filename))$data)
+  }
+```
+#Step-3: Refine the Data: Do the basic refinement to clean up the dataset.
+
+  Remove the leading and trailing spaces in each column in the data frame.
+  
+```{r}
+jsondata$Season = gsub("^\\s+|\\s+$", "", jsondata$Season)
+jsondata$Sector = gsub("^\\s+|\\s+$", "", jsondata$Sector)
+jsondata$Category = gsub("^\\s+|\\s+$", "", jsondata$Category)
+jsondata$Crop = gsub("^\\s+|\\s+$", "", jsondata$Crop)
+jsondata$QueryType = gsub("^\\s+|\\s+$", "", jsondata$QueryType)
+jsondata$QueryText = gsub("^\\s+|\\s+$", "", jsondata$QueryText)
+jsondata$KCCAns = gsub("^\\s+|\\s+$", "", jsondata$KCCAns)
+jsondata$StateName = gsub("^\\s+|\\s+$", "", jsondata$StateName)
+jsondata$DistrictName = gsub("^\\s+|\\s+$", "", jsondata$DistrictName)
+jsondata$BlockName = gsub("^\\s+|\\s+$", "", jsondata$BlockName)
+jsondata$SubmitDate = gsub("^\\s+|\\s+$", "", jsondata$SubmitDate)
+```
+
+#Step-4: Transform the Data: Do the transformation needed for the dataset.
+
+  Do the following transformations in the data.
+    1. Convert the Submit Date to the Date class
+    2. Find and replace the special characters like '\t' , '\r' in the data
+    3. The data in the KCCAns column is in both upper and lower case. Convert everything to upper case.
+    4. The Crop alias name is mentioned in the Crop column. Create a seperate column and move the alaias name into it.
+    5. Split the Submit date into YY , MM , DD columns.
+    
+```{r}
+library(dplyr)
+library(tidyr)
+jsondata$SubmitDate = as.Date(jsondata$SubmitDate,format = '%m/%d/%Y')
+jsondata$QueryType = gsub("\\t", "", jsondata$QueryType)
+jsondata$KCCAns = gsub("\\t|\\r", "", jsondata$KCCAns)
+jsondata$KCCAns = toupper(jsondata$KCCAns)
+jsondata= jsondata %>% mutate(tempCrop = Crop) %>%
+      separate(tempCrop, c("ActName_Crop", "AltName_Crop"), sep = "\\(")
+jsondata= jsondata %>% mutate(tempDate = as.character(jsondata$SubmitDate) ) %>%
+      separate(tempDate, c("Year","Month","Date"), sep = "-")
+
+jsondata$ActName_Crop = gsub("^\\s+|\\s+$", "", jsondata$ActName_Crop) 
+jsondata$AltName_Crop = gsub(")", "", jsondata$AltName_Crop)
+
+jsondata_QueryType_GroupFreq = data.frame('','')
+jsondata_QueryType_GroupFreq = data.frame(table(jsondata$QueryType))
+colnames(jsondata_QueryType_GroupFreq) = c('QueryType','QueryTypeCount')
+
+jsondata_Season_GroupFreq = data.frame('','')
+jsondata_Season_GroupFreq = data.frame(table(jsondata$Season))
+colnames(jsondata_Season_GroupFreq) = c('Season','SeasonCount')
+
+jsondata_Sector_GroupFreq = data.frame('','')
+jsondata_Sector_GroupFreq = data.frame(table(jsondata$Sector))
+colnames(jsondata_Sector_GroupFreq) = c('Sector','SectorCount')
+
+jsondata_BlockName_GroupFreq = data.frame('','')
+jsondata_BlockName_GroupFreq = data.frame(table(jsondata$BlockName))
+colnames(jsondata_BlockName_GroupFreq) = c('BlockName','BlockNameCount')
+
+jsondata_SubmitMonth_GroupFreq = data.frame('','')
+jsondata_SubmitMonth_GroupFreq = data.frame(table(paste(jsondata$Month,"-",jsondata$Year)))
+str(jsondata_SubmitMonth_GroupFreq)
+colnames(jsondata_SubmitMonth_GroupFreq) = c('SubmitMonth','SubmitMonthCount')
+
+jsondata_SubmitDate_GroupFreq = data.frame('','')
+jsondata_SubmitDate_GroupFreq = data.frame(table(jsondata$SubmitDate))
+colnames(jsondata_SubmitDate_GroupFreq) = c('SubmitDate','SubmitDateCount')
+
+jsondata_BlockName_GroupFreq = data.frame('','')
+jsondata_BlockName_GroupFreq = data.frame(table(jsondata$BlockName))
+colnames(jsondata_BlockName_GroupFreq) = c('BlockName','BlockNameCount')
+
+```
+
+#Step-5: Explore the Data: Create the 3 - 4 individual visualisation that explore the dataset.
+
+  Exploring the data by creating the visualisations
+  
+  1. Bar Chart by grouping based on the QueryType
+  2. Point Plot by grouping based on the BlockName
+  3. Bar Chart by grouping based on the Sector
+  4. Pie Chart by grouping based on Season
+  5. Bar Chart by grouping based on the Month in which the request is submitted.
+  
+```{r}
+library(ggplot2)
+library(plotly)
+ggplot(jsondata_QueryType_GroupFreq) + aes(jsondata_QueryType_GroupFreq$QueryType,weight = jsondata_QueryType_GroupFreq$QueryTypeCount,fill=jsondata_QueryType_GroupFreq$QueryType) + geom_bar()
+
+ggplot(jsondata_BlockName_GroupFreq) + aes(jsondata_BlockName_GroupFreq$BlockName,jsondata_BlockName_GroupFreq$BlockNameCount) +  geom_point(aes(size = jsondata_BlockName_GroupFreq$BlockNameCount))
+
+ggplot(jsondata_Sector_GroupFreq) + 
+  aes(jsondata_Sector_GroupFreq$Sector,weight = jsondata_Sector_GroupFreq$SectorCount,fill=jsondata_Sector_GroupFreq$Sector)  + geom_bar()
+
+ggplot(jsondata_Season_GroupFreq, aes(x = factor(jsondata_Season_GroupFreq$SeasonCount), fill = factor(jsondata_Season_GroupFreq$Season))) +
+ geom_bar(width = 1) + coord_polar(theta = "x") 
+
+ggplot(jsondata_SubmitMonth_GroupFreq) + aes(jsondata_SubmitMonth_GroupFreq$SubmitMonth,weight = jsondata_SubmitMonth_GroupFreq$SubmitMonthCount,fill=jsondata_SubmitMonth_GroupFreq$SubmitMonth) + geom_bar()
+
+```
+
+#Step-6: Model the Data: Do the basic modelling (as needed) to answer the question
+
+  Predict the number of calls KCC will receive in 2017 on daily basis for next 1 year
+  
+```{r}
+
+library("rstan")
+library("dplyr")
+library("prophet")
+
+ggplot(jsondata_SubmitDate_GroupFreq) + aes(jsondata_SubmitDate_GroupFreq$SubmitDate,jsondata_SubmitDate_GroupFreq$SubmitDateCount) + geom_line()
+colnames(jsondata_SubmitDate_GroupFreq) <- c('ds', 'y')
+prophetObject <- prophet(jsondata_SubmitDate_GroupFreq)
+futuredataFrame <- make_future_dataframe(prophetObject, periods = 360, freq = 'd', include_history = TRUE )
+forecastData <- predict(prophetObject, futuredataFrame)
+plot(prophetObject, forecastData)
+prophet_plot_components(prophetObject, forecastData)
+```
+
+#Step-7: Communicate the insight: Create final visualisations to share the insight.
+
+```{r}
+library(ggmap)
+BlockGeoLoc = geocode(as.character(jsondata_BlockName_GroupFreq$BlockName))
+dfGeoLoc = bind_cols(data.frame(jsondata_BlockName_GroupFreq$BlockName),BlockGeoLoc, jsondata_BlockName_GroupFreq)
+ggplot(dfGeoLoc) + aes(lon, lat) + geom_point() + coord_map()
+IndiaMap <- get_map("India", maptype = "watercolor", source = "stamen", zoom = 6)
+ggmap(IndiaMap) + geom_point(data = dfGeoLoc,aes(lon,lat,size = dfGeoLoc$BlockNameCount,color = dfGeoLoc$BlockName))
+```

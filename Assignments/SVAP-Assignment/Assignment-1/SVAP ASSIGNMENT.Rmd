@@ -1,0 +1,124 @@
+---
+title: "SVAP ASSIGMENT - DAILY MARKET ARRIVALS AND ONION PRICES"
+output:
+  html_document: default
+  html_notebook: default
+  pdf_document: default
+  word_document: default
+---
+
+#Step-1 : Frame
+  
+    The following analysis of the Daily Market Arrivals and Onion Prices is done to answer the following two questions.
+    1. Which state has the highest sale of onions in a day
+    2. Predict the price of onion for the next 30 days in that state,
+    
+#Step-2 : Acquire
+
+    Lets get the data from the nhrdf data source starting from year 2016 through 2017.The link for the data is as below
+    
+    http://nhrdf.org/en-us/DailyWiseMarketArrivals
+    
+```{r AcquireChunk}
+library("rvest")
+setwd("F:\\GLIMS-PGPBDA\\Assignments\\SVAP-Assignment\\Assignment-1\\")
+pg.out = read_html("DailyWiseMarketArrivals_htm_2017.htm")
+pg.table = pg.out %>% html_node("#dnn_ctr966_DailyWiseMarketArrivals_GridView1") %>% html_table
+df_2017 = pg.table
+
+```
+
+#Step-3 : Refine
+
+In this section, the following actions are done.
+1. Change the Column Names
+2. Remove the Total Row in the last.
+3. Convert the Data types of Date , Price(Min) , Price (Max) , Price (Mode)
+4. Split the Market Column into two different columns holding the City and State
+5. Have unique name for the Telangana State
+6. Cleanup data to ensure that you have state for all cities.
+
+``` {r Refine}
+library(dplyr)
+library(tidyr)
+newColNames = c('Date','Market','Arr Qty','Min Price','Max Price','Modal Price')
+colnames(df_2017) = newColNames
+
+df_2017 = df_2017 %>% filter(Market != "Total")
+df_2017$`Max Price` = as.numeric(df_2017$`Max Price`)
+df_2017$`Min Price` = as.numeric(df_2017$`Min Price`)
+df_2017$`Modal Price` = as.numeric(df_2017$`Modal Price`)
+df_2017$Date = as.Date(df_2017$Date, format = '%d/%B/%Y')
+str(df_2017)
+
+library(stringr)
+df_2017$Market <- str_replace_all(df_2017$Market, "BANGALORE", "BANGALORE(KNT)" )
+df_2017$Market <- str_replace_all(df_2017$Market, "BHOPAL", "BHOPAL(MP)" )
+df_2017$Market <- str_replace_all(df_2017$Market, "CHANDIGARH", "CHANDIGARH(PUN)" )
+df_2017$Market <- str_replace_all(df_2017$Market, "CHENNAI", "CHENNAI(TN)" )
+df_2017$Market <- str_replace_all(df_2017$Market, "DELHI", "DELHI(DL)" )
+df_2017$Market <- str_replace_all(df_2017$Market, "GUWAHATI", "GUWAHATI(ASSAM)" )
+df_2017$Market <- str_replace_all(df_2017$Market, "HYDERABAD", "HYDERABAD(TG)" )
+df_2017$Market <- str_replace_all(df_2017$Market, "JAIPUR", "RAIPUR(RAJASTHAN)" )
+df_2017$Market <- str_replace_all(df_2017$Market, "JAMMU", "JAMMU(JK)" )
+df_2017$Market <- str_replace_all(df_2017$Market, "LUCKNOW", "LUCKNOW(UP)" )
+df_2017$Market <- str_replace_all(df_2017$Market, "MUMBAI", "MUMBAI(MS)" )
+df_2017$Market <- str_replace_all(df_2017$Market, "NAGPUR", "NAGPUR(MS)" )
+df_2017$Market <- str_replace_all(df_2017$Market, "PATNA", "PATNA(BH)" )
+df_2017$Market <- str_replace_all(df_2017$Market, "KOLKATA", "KOLKATA(WB)" )
+df_2017 = df_2017 %>%
+      mutate(Market1 = Market) %>%
+      separate(Market1, c("City", "State"), sep = "\\(")
+df_2017$State = df_2017$State %>% str_replace("\\)","")
+df_2017$State <- str_replace_all(df_2017$State, "Telangana", "TG" )
+df_2017$State <- str_replace_all(df_2017$State, "TELANGANA", "TG" )
+
+```
+
+#Step-4 : Transform
+
+  1. Group the data by State and find the sum of the quantity of all days and find the state which has maximum Quantity
+```{r}
+df_2017_Sum= df_2017 %>% group_by(State) %>% summarise(Qty_Day = sum(`Arr Qty`))
+df_2017_Sum[which.max(df_2017_Sum$Qty_Day),]
+```
+
+
+#Step-5 : Explore
+
+```{r}
+library(ggplot2)
+library(plotly)
+ggplot(df_2017_Sum) + aes(State,weight = Qty_Day) + geom_bar()
+```
+
+#Step-6 : Model
+
+  Predicting the Future Sales Quantity ( for 30 days )
+
+```{r}
+library("rstan")
+library("dplyr")
+df_2017_State = df_2017 %>% filter(df_2017$State == "MS") %>% select(Date, `Arr Qty`) %>%  arrange(Date)
+ggplot(df_2017_State) + aes(Date,`Arr Qty`) + geom_line()
+str(df_2017_State)
+library("prophet")
+colnames(df_2017_State) <- c('ds', 'y')
+prophetObject <- prophet(df_2017_State)
+futuredataFrame <- make_future_dataframe(prophetObject, periods = 30, freq = 'd', include_history = FALSE )
+forecastData <- predict(prophetObject, futuredataFrame)
+plot(prophetObject, forecastData)
+prophet_plot_components(prophetObject, forecastData)
+```
+
+#Step-6 : Insight/Communicate
+
+```{r}
+library(ggmap)
+Cities = unique(df_2017$City)
+CitiesGeoLoc = geocode(Cities)
+dfGeoLoc = bind_cols(df_2017_Sum$City,CitiesGeoLoc)
+ggplot(dfGeoLoc) + aes(lon, lat) + geom_point() + coord_map()
+IndiaMap <- get_map("India", maptype = "watercolor", source = "stamen", zoom = 5)
+ggmap(IndiaMap) + geom_point(data = dfGeoLoc,aes(lon,lat))
+```
