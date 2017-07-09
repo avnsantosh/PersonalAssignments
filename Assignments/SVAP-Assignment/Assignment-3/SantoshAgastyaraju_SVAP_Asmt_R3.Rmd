@@ -2,7 +2,9 @@
 title: "SantoshAgastyaraju_SVAP_Asmt_R3"
 author: "Santosh Agastyaraju"
 date: "July 8, 2017"
-output: html_notebook
+output:
+  html_notebook: default
+  word_document: default
 ---
 
 ```{r setup, include=FALSE}
@@ -13,7 +15,7 @@ This case study is Monthly production central statistics of food and beverages f
 
 #Step-1: Frame the Problem: Identify the key question are you trying to answer
 
-  1. Predict the number of calls KCC will receive in 2017 on daily basis
+  Plot the interactive plots for the data set.
   
 #Step-2: Acquire the Data: Get the dataset to answer the question.
   
