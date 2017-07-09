@@ -1,0 +1,104 @@
+---
+title: "SantoshAgastyaraju_SVAP_Asmt_R3"
+author: "Santosh Agastyaraju"
+date: "July 8, 2017"
+output: html_notebook
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+This case study is Monthly production central statistics of food and beverages from year 1997-2011. The data is in the csv format.
+
+#Step-1: Frame the Problem: Identify the key question are you trying to answer
+
+  1. Predict the number of calls KCC will receive in 2017 on daily basis
+  
+#Step-2: Acquire the Data: Get the dataset to answer the question.
+  
+  Acquire the data from the csv file and load it.
+  
+``` {r DataRead}
+setwd="F:\\GLIMS-PGPBDA\\Assignments\\SVAP-Assignment\\Assignment-3\\"
+rawdata = read.csv("Production-Department_of_Agriculture_and_Cooperation_1.csv")
+str(rawdata)
+```
+
+#Step-3: Refine the Data: Do the basic refinement to clean up the dataset.
+
+  Have only the data related to area wise food grain production
+
+```{r}
+library(tidyr)
+rawdata = rawdata[grepl('Agricultural Production Foodgrains Area ',rawdata$Particulars),]
+rawdata = rawdata[!grepl('Agricultural Production Foodgrains Area 5 Yr',rawdata$Particulars),]
+rawdata = rawdata[,-2:-14]
+str(rawdata)
+```
+
+#Step-4: Transform the Data: Do the transformation needed for the dataset.
+
+  Do the following transformations in the data.
+  Split the Particulars column name and have the State in seperate column
+
+```{r}
+library(splitstackshape)
+rawdata$Particulars = as.character(rawdata$Particulars)
+rawdata = cSplit(rawdata, "Particulars", " ")
+rawdata = rawdata[ , -c("Particulars_1","Particulars_2","Particulars_3","Particulars_4")]
+ rawdata$State = paste(rawdata$Particulars_5,rawdata$Particulars_6)
+ rawdata = rawdata[ , -c("Particulars_5","Particulars_6","X3.2014")]
+ rawdata$State = sub("NA","",rawdata$State)
+ 
+ rawdata$TotalStats = rawdata$X3.2004+rawdata$X3.2005+rawdata$X3.2006+rawdata$X3.2007+rawdata$X3.2008+rawdata$X3.2009+rawdata$X3.2010+rawdata$X3.2011+rawdata$X3.2012+rawdata$X3.2013
+ rawdata
+```
+
+#Step-5: Explore the Data: Create the 3 - 4 individual visualisation that explore the dataset.
+
+  Exploring the data by creating the visualisations
+  
+  
+```{r}
+library(ggplot2)
+library(plotly)
+library(knitr)
+library(DT)
+
+ggplot(rawdata) + aes(rawdata$State,weight = rawdata$X3.2004 , color = rawdata$State) + geom_bar()
+ggplot(rawdata) + aes(rawdata$State,weight = rawdata$X3.2005) + geom_bar()
+ggplot(rawdata) + aes(rawdata$State,weight = rawdata$X3.2006) + geom_bar()
+ggplot(rawdata) + aes(rawdata$State,weight = rawdata$X3.2007) + geom_bar()
+ggplot(rawdata) + aes(rawdata$State,weight = rawdata$X3.2008) + geom_bar()
+ggplot(rawdata) + aes(rawdata$State,weight = rawdata$X3.2009) + geom_bar()
+ggplot(rawdata) + aes(rawdata$State,weight = rawdata$X3.2010) + geom_bar()
+ggplot(rawdata) + aes(rawdata$State,weight = rawdata$X3.2011) + geom_bar()
+ggplot(rawdata) + aes(rawdata$State,weight = rawdata$X3.2012) + geom_bar()
+ggplot(rawdata) + aes(rawdata$State,weight = rawdata$X3.2013) + geom_bar()
+ggplot(rawdata) + aes(rawdata$State,weight = rawdata$TotalStats) + geom_bar()
+
+datatable(rawdata,option = list(pagelength = 5))
+
+library(ggplot2)
+plot1 = ggplot(rawdata) + aes(rawdata$State,rawdata$TotalStats , color=rawdata$State ) + geom_point()
+
+library(plotly)
+
+ggplotly(plot1)
+
+library(crosstalk)
+library(d3scatter)
+
+shared_rawdata <- SharedData$new(rawdata)
+
+bscols(
+  list(
+    filter_checkbox("State", "StateSelect", shared_rawdata, ~State, inline = TRUE),
+    filter_slider("TotalStats", "TotalStats", shared_rawdata, ~TotalStats, width = "100%")
+  ),
+  d3scatter(shared_rawdata, ~TotalStats, ~X3.2004, ~State, width="100%", height=300),
+  d3scatter(shared_rawdata, ~TotalStats, ~X3.2005, ~State, width="100%", height=300)
+)
+
+```
